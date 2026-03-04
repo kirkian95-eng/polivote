@@ -347,6 +347,41 @@ Canvassers often work in areas with poor cell service.
 
 ---
 
+## Email & SMS
+
+### Email: Amazon SES
+- $0.10 per 1,000 emails (~$100/month at 1M emails)
+- Political campaign email explicitly allowed
+- We build our own compliance layer: unsubscribe management, bounce handling, open/click tracking, template storage
+- Fits existing AWS ecosystem (RDS, ECS, S3)
+
+### SMS: Twilio
+- ~$0.011-0.012 per message all-in (message + carrier surcharges)
+- Best political 10DLC support — dedicated Campaign Verify integration for 527/PAC organizations
+- Uncapped messaging limits for registered political campaigns
+- Built-in opt-out handling, consent management, TCPA compliance
+
+---
+
+## Billing: Stripe
+
+```
+Stripe Billing (subscriptions + usage metering)
+├── Stripe Checkout (self-serve signup)
+├── Stripe Invoicing (enterprise/PO customers)
+├── Stripe Tax (US sales tax calculation + collection)
+├── Stripe Customer Portal (plan changes, payment updates)
+└── Webhooks → Node.js backend (provision/deprovision tenant access)
+```
+
+- Subscriptions: fixed monthly plans per campaign size tier
+- Usage-based add-ons: SMS credits, extra voter file imports (via Stripe Meters API)
+- Enterprise invoicing: NET 30/60 for larger campaigns paying by check/PO
+- Sales tax: Stripe Tax calculates + collects across all US states
+- Payouts: 2 business days
+
+---
+
 ## Estimated Infrastructure Cost (Production)
 
 | Component | Monthly Cost |
@@ -356,14 +391,13 @@ Canvassers often work in areas with poor cell service.
 | S3 + CloudFront (PMTiles basemap + uploads) | $5-15 |
 | Valkey (ElastiCache t3.micro) | $15-25 |
 | ECS (API + workers) | $30-60 |
-| **Total** | **$80-190/month** |
+| Amazon SES (at 100k emails) | ~$10 |
+| **Total infrastructure** | **$90-200/month** |
 
-All software licensing: $0.
+All software licensing: $0. Twilio and Stripe are usage-based (pass through to customers or absorb as COGS).
 
 ---
 
-## Remaining Decisions
+## All Architecture Decisions Complete
 
-- **Email/SMS provider?** SendGrid + Twilio? Resend + something cheaper?
-- **Payment/billing?** Stripe for SaaS subscriptions.
-- **Precinct data pipeline** — automate download + load of TIGER/Line + NYT boundaries?
+See [docs/decisions.md](decisions.md) for full rationale on every choice (17 ADRs).

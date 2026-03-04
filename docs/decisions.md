@@ -187,3 +187,61 @@ Each decision records what we chose, why, what we almost chose, and why we didn'
 **Runner-up:** React Native mobile app
 
 **Why not:** Requires separate codebase (or at least separate build targets), app store submission and approval process, and native build infrastructure. For our use case — filling out forms, viewing a map, recording door responses — a well-built PWA provides equivalent functionality without the overhead. If we later need native features (push notifications on iOS, background GPS tracking), we can add a thin React Native shell around the PWA.
+
+---
+
+## ADR-015: Email — Amazon SES
+
+**Chosen:** Amazon SES (AWS service, pay-per-use)
+
+**Why:** $0.10 per 1,000 emails — 10x cheaper than any alternative at scale. At 1M emails/month, SES costs ~$100 vs. ~$900-1,300 for SendGrid or Mailgun. Political campaign email is explicitly allowed (consent-based). Since we're building a SaaS platform, we need to build template management, campaign orchestration, and analytics dashboards regardless — SES gives us full control over the infrastructure at the lowest cost. Already on AWS for hosting (RDS, ECS, S3), so SES fits the existing ecosystem with no new vendor relationship.
+
+**Runner-up:** SendGrid Pro ($89.95/month for 100k emails, ~$900-1,300/month at 1M)
+
+**Why not:** 10x more expensive at scale. The built-in compliance tooling (unsubscribe management, template editor, click/open tracking) is nice, but we'd need to build most of that ourselves anyway for a SaaS product — our customers need to manage their own campaigns, not use SendGrid's UI. SendGrid is the fallback if we need faster time-to-market and are willing to pay the premium. Its deliverability with dedicated IPs (Pro plan) is solid, and political email is documented as an accepted use case.
+
+**Also considered:** Resend — excellent developer experience and modern TypeScript SDK, but a hard 2 req/sec rate limit makes sending 1M emails operationally painful (~83 minutes best case). Too young a platform to bet on for political bulk email. Mailgun — competitive pricing and good deliverability, but no meaningful advantage over SES at our scale. Postmark — premium deliverability but designed for transactional email, not bulk political outreach. Pricing is the highest of all options (~$1,200-1,800/month at 1M). Political content policy is unclear.
+
+**Build cost:** We need to implement: unsubscribe management, bounce/complaint handling (via SNS topics), open/click tracking (via SES configuration sets), template storage, and deliverability monitoring. This is real engineering work (~2-4 weeks) but pays for itself within a few months of operation at scale.
+
+---
+
+## ADR-016: SMS — Twilio
+
+**Chosen:** Twilio (~$0.011-0.012 per message all-in)
+
+**Why:** Best-in-class political messaging support. Twilio is the only provider with dedicated documentation for political ISVs, a purpose-built Campaign Verify integration for 527 organizations/PACs, and uncapped messaging limits for registered political campaigns. The 10DLC political special use case registration path is fully self-service and well-documented. The Node.js SDK (`twilio` on npm) is the most mature communication SDK in the ecosystem. Built-in opt-out handling, consent management, delivery receipts, and compliance webhooks cover TCPA requirements out of the box.
+
+**Runner-up:** Plivo (~$0.009-0.012 per message, 15-20% cheaper)
+
+**Why not:** Plivo explicitly supports political campaigns and has published content about streamlining 10DLC for political use. Pricing is 15-20% lower per message. However, political campaign registration requires a manual support ticket rather than self-service, and the SDK community is significantly smaller. Plivo is a strong cost-optimization path once we have volume and operational maturity — we could switch or add Plivo as a secondary provider later.
+
+**Also considered:** Telnyx — cheapest full-featured option (~$0.007-0.010/msg) with an excellent modern TypeScript SDK, but political messaging requires pre-vetting and whitelisting, adding operational friction. Good future option for cost savings. Amazon SNS — cheapest on paper (~$0.006-0.009/msg) but **does not support the political 10DLC special use case** through its registration system. Only supports non-religious 501(c)(3) charities as special use cases. Without proper political campaign registration, messages would be blocked by carriers. Dealbreaker. Vonage — supports political messaging and competitive pricing, but no meaningful advantage over Twilio and a smaller ecosystem.
+
+**Cost at scale:** At 100k messages/month: ~$1,100-1,200. At 500k: ~$5,500-6,000. Volume discounts of 30%+ available with committed contracts at millions/month.
+
+---
+
+## ADR-017: Payment & Billing — Stripe Billing + Stripe Tax
+
+**Chosen:** Stripe Billing (Starter, +0.5% on recurring) + Stripe Tax ($0.50/transaction or $90/month for auto-filing) + Stripe Checkout + Stripe Customer Portal
+
+**Why:** One vendor, one SDK, one dashboard covering all billing scenarios. Stripe Billing handles subscriptions (fixed monthly plans) alongside usage-based metering (SMS credits, extra voter file imports) in a single system. Stripe Invoicing supports NET 30/60 terms and manual payment methods for larger campaigns that pay by check or PO. Stripe Tax calculates and collects US sales tax across all states automatically. Stripe Customer Portal gives campaigns self-service plan changes and payment method updates. The `stripe` npm package is the gold standard for payment SDKs. Payouts land in 2 business days — critical for startup cash flow. Total cost on a $100/month subscription: ~$3.70, the lowest of all options evaluated.
+
+**Note on political restrictions:** Stripe lists "fundraising conducted by political organisations" as a restricted category. This applies to processing political donations from the public, not selling B2B SaaS subscriptions. We are selling software to campaigns, not processing donations. Standard B2B SaaS billing. Confirm with Stripe support before launch, but this should be a non-issue.
+
+**Runner-up:** Paddle (5% + $0.50 per transaction, merchant of record)
+
+**Why not:** The merchant-of-record model is attractive — Paddle handles sales tax collection, filing, and remittance completely, eliminating all tax compliance burden. However: (1) At $5.50 per $100 transaction vs. Stripe's ~$3.70, Paddle costs 49% more per transaction. At $50k+ MRR this adds up to thousands/month in extra fees. (2) Payouts are monthly (funds arrive ~15th of the following month) vs. Stripe's 2-day rolling payouts — devastating for startup cash flow. (3) No enterprise invoicing for check/PO payments, which larger campaigns will need. (4) Usage-based billing is less mature than Stripe's Meters API. The tax compliance convenience doesn't justify the cost, payout delay, and feature gaps.
+
+**Also considered:** Chargebee + Stripe — Chargebee adds sophisticated subscription management (custom contracts, quote-to-cash, revenue recognition) on top of Stripe. Free up to $250k lifetime billing. Overkill for launch, but a good option if billing complexity grows significantly. Would add a second system to integrate and maintain. Lemon Squeezy — same 5% + $0.50 as Paddle but less mature, no enterprise invoicing, and the platform is actively migrating to Stripe's new managed payments product, introducing existential platform risk. Recurly — opaque pricing, enterprise-oriented sales process, no clear advantage over Chargebee.
+
+**Architecture:**
+```
+Stripe Billing (subscriptions + usage metering)
+├── Stripe Checkout (self-serve signup)
+├── Stripe Invoicing (enterprise/PO customers)
+├── Stripe Tax (US sales tax calculation + collection)
+├── Stripe Customer Portal (plan changes, payment updates)
+└── Webhooks → Node.js backend (provision/deprovision tenant access)
+```

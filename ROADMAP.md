@@ -10,9 +10,9 @@ Write detailed descriptions of every feature we want. Focus on what the software
 ## Phase 2: Architecture & Tech Decisions
 For each feature, evaluate the best technologies, patterns, and approaches. Make stack decisions, choose a database, define the data model, settle on auth strategy, deployment plan, etc.
 
-See [docs/architecture.md](docs/architecture.md) for full details.
+See [docs/architecture.md](docs/architecture.md) for full details. All 17 decisions documented in [docs/decisions.md](docs/decisions.md).
 
-**Status:** In progress
+**Status:** Done
 
 ## Phase 3: Implementation Plan
 Break the architecture into an ordered build plan — what gets built first, dependencies between components, milestones, and acceptance criteria for each piece.
