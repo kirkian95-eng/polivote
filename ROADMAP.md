@@ -5,12 +5,14 @@
 ## Phase 1: Define Features
 Write detailed descriptions of every feature we want. Focus on what the software should do from a campaign operator's perspective. No implementation details yet.
 
-**Status:** In progress
+**Status:** Done
 
 ## Phase 2: Architecture & Tech Decisions
 For each feature, evaluate the best technologies, patterns, and approaches. Make stack decisions, choose a database, define the data model, settle on auth strategy, deployment plan, etc.
 
-**Status:** Not started
+See [docs/architecture.md](docs/architecture.md) for full details.
+
+**Status:** In progress
 
 ## Phase 3: Implementation Plan
 Break the architecture into an ordered build plan — what gets built first, dependencies between components, milestones, and acceptance criteria for each piece.
@@ -126,10 +128,10 @@ End-to-end testing, security audit, load testing, accessibility review. Verify c
 
 ---
 
-## Open Questions (Phase 1)
-- What level of government is the primary target? (municipal, county, state, federal — affects data complexity)
-- Single-campaign tool or multi-campaign/party platform?
-- Self-hosted or SaaS? Or both?
-- What states/jurisdictions first? (voter file formats vary wildly)
-- Real-time election night data sources — manual entry only, or integrate with state/county feeds?
-- Mobile app for canvassers, or mobile-responsive web?
+## Decisions (Phase 1)
+- **Election level:** Any — municipal through federal
+- **Platform model:** Single-campaign (one campaign per tenant)
+- **Deployment:** SaaS
+- **Jurisdictions:** Jurisdiction-agnostic — must handle any state/county voter file format
+- **Data automation:** Fully automated — result ingestion, voter file processing, projections
+- **Field interface:** Mobile-responsive web app (PWA) for canvassers and field workers
